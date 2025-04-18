@@ -43,6 +43,11 @@ This command allows you to configure:
 - `renpy-helper rembg`: Remove backgrounds from images using the rembg tool
 - `renpy-helper settings`: Configure tool settings
 
+### Package Information
+
+- Package name: `@dasheck0/renpy-helper`
+- Binary name: `renpy-helper`
+
 ### Settings File
 
 Settings are stored in a `.renpy-helper-settings.json` file in the current directory. The file structure is:
@@ -70,11 +75,11 @@ Settings are stored in a `.renpy-helper-settings.json` file in the current direc
 
 ```bash
 # Install globally from npm
-npm install -g dasheck0-renpy-helper
+npm install -g @dasheck0/renpy-helper
 
 # Or install from source
-git clone https://github.com/dasheck0/dasheck0-renpy-helper.git
-cd dasheck0-renpy-helper
+git clone https://github.com/dasheck0/renpy-helper.git
+cd renpy-helper
 npm install
 npm run build
 npm link
@@ -88,8 +93,8 @@ npm link
 
 ```bash
 # Clone the repository
-git clone https://github.com/dasheck0/dasheck0-renpy-helper.git
-cd dasheck0-renpy-helper
+git clone https://github.com/dasheck0/renpy-helper.git
+cd renpy-helper
 
 # Install dependencies
 npm install
@@ -107,7 +112,16 @@ npm run build
 2. Export a command object with `name`, `description`, and `action` properties
 3. Import and register the command in `src/index.ts`
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/dasheck0/dasheck0-renpy-helper. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the Contributor Covenant code of conduct.
+### Continuous Integration
+
+This project uses GitHub Actions for continuous integration:
+
+- **npm_publish.yml**: Automatically publishes the package to npm and GitHub Packages when a new version tag (v*) is pushed
+  - Runs linting and tests
+  - Publishes to npm registry and GitHub Packages
+  - Requires NPM_TOKEN secret to be set in the repository
+
+Bug reports and pull requests are welcome on GitHub at https://github.com/dasheck0/renpy-helper. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the Contributor Covenant code of conduct.
 
 ## License
 <!-- section: License -->
