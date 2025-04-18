@@ -82,17 +82,14 @@ export const rembgCommand = {
         }
       };
 
-      // Function to navigate directories and select multiple files
+      // Function to navigate to a directory and then select files
       const selectFiles = async (): Promise<string[]> => {
         // Start from the input directory in settings
         let currentDir = path.resolve(rembgSettings.inputDirectory);
-        let selectedFiles: string[] = [];
-        let done = false;
+        let inSelectionMode = true;
 
-        // Keep track of selected files in each directory
-        const selectedFilesMap = new Map<string, Set<string>>();
-
-        while (!done) {
+        // First, navigate to the desired directory
+        while (!inSelectionMode) {
           console.log(`\nCurrent directory: ${currentDir}`);
 
           // Get all files and directories in the current directory
@@ -109,120 +106,31 @@ export const rembgCommand = {
           const directories = dirItems.filter(item => item.isDirectory);
           const files = dirItems.filter(item => !item.isDirectory);
 
-          // Get the set of selected files in the current directory
-          const selectedInCurrentDir = selectedFilesMap.get(currentDir) || new Set<string>();
+          // If there are files in this directory, offer to enter selection mode
+          const hasFiles = files.length > 0;
 
-          // If there are files in this directory, show the checkbox selection
-          if (files.length > 0) {
-            // Create checkbox choices for files
-            const fileChoices = files.map(file => ({
-              name: `${selectedInCurrentDir.has(file.value) ? '(o)' : '( )'} ${file.name}`,
-              value: file.value,
-              short: file.name
-            }));
-
-            // Add a confirm selection option
-            const confirmOption = {
-              name: `--- ${selectedFiles.length > 0 ? 'Confirm selection' : 'No files selected (select with SPACE)'} ---`,
-              value: 'confirm'
-            };
-
-            // Add a parent directory option
-            const parentOption = {
-              name: '../ (Go up one directory)',
-              value: '..'
-            };
-
-            // Prompt for file selection
-            const { selectedItems } = await inquirer.prompt([
-              {
-                type: 'checkbox',
-                name: 'selectedItems',
-                message: 'Select files with SPACE, navigate with arrow keys, confirm with ENTER:',
-                choices: [
-                  new inquirer.Separator('--- Navigation ---'),
-                  parentOption,
-                  confirmOption,
-                  new inquirer.Separator('--- Files ---'),
-                  ...fileChoices
-                ],
-                pageSize: 15,
-                default: Array.from(selectedInCurrentDir)
-              }
-            ]);
-
-            // Check if the user wants to navigate up
-            if (selectedItems.includes('..')) {
-              // Go up one directory
-              currentDir = path.resolve(currentDir, '..');
-              continue;
-            }
-
-            // Check if the user wants to confirm the selection
-            if (selectedItems.includes('confirm')) {
-              // Remove the confirm option from the selection
-              const actualFiles = selectedItems.filter((item: string) => item !== 'confirm' && item !== '..');
-
-              // Update the selected files in the current directory
-              selectedFilesMap.set(currentDir, new Set(actualFiles));
-
-              // If there are selected files, we're done
-              if (selectedFiles.length > 0) {
-                done = true;
-              } else {
-                console.log('\nNo files selected. Please select at least one file or navigate to another directory.');
-              }
-              continue;
-            }
-
-            // Update the selected files in the current directory
-            selectedFilesMap.set(currentDir, new Set(selectedItems.filter((item: string) => item !== '..')));
-
-            // Update the overall selected files list
-            selectedFiles = [];
-            for (const [dir, files] of selectedFilesMap.entries()) {
-              for (const file of files) {
-                selectedFiles.push(path.join(dir, file));
-              }
-            }
-
-            // Show the current selection
-            if (selectedFiles.length > 0) {
-              console.log('\nCurrently selected files:');
-              selectedFiles.forEach((file, index) => {
-                console.log(`${index + 1}. ${file}`);
-              });
-            }
-
-            continue;
-          }
-
-          // If there are only directories, show a list selection
           const { selected } = await inquirer.prompt([
             {
               type: 'list',
               name: 'selected',
-              message: selectedFiles.length > 0
-                ? `Navigate to a directory (${selectedFiles.length} files selected):`
-                : 'Navigate to a directory:',
+              message: 'Navigate to a directory or select files:',
               choices: [
                 ...directories,
                 new inquirer.Separator('---'),
                 {
-                  name: selectedFiles.length > 0 ? 'Confirm selection' : 'No files selected',
-                  value: 'confirm'
+                  name: hasFiles ? 'Select files in this directory' : 'No files in this directory',
+                  value: 'select',
+                  disabled: !hasFiles
                 }
               ],
               pageSize: 15
             }
           ]);
 
-          // Handle directory navigation or confirmation
-          if (selected === 'confirm') {
-            if (selectedFiles.length > 0) {
-              done = true;
-            } else {
-              console.log('\nNo files selected. Please navigate to a directory with files.');
+          if (selected === 'select') {
+            // Enter file selection mode
+            if (hasFiles) {
+              inSelectionMode = true;
             }
           } else if (selected === '..') {
             // Go up one directory
@@ -233,17 +141,35 @@ export const rembgCommand = {
           }
         }
 
-        return selectedFiles;
+        // Now in file selection mode - get all image files in the current directory
+        const files = getFilesAndDirs(currentDir)
+          .filter(item => !item.isDirectory)
+          .map(file => ({
+            name: file.name,
+            value: path.join(currentDir, file.value)
+          }));
+
+        if (files.length === 0) {
+          console.log('No files found in this directory.');
+          return [];
+        }
+
+        // Show checkbox selection for files
+        const { selectedFiles: selectedPaths } = await inquirer.prompt([
+          {
+            type: 'checkbox',
+            name: 'selectedFiles',
+            message: 'Select files with SPACE, then press ENTER to process:',
+            choices: files,
+            pageSize: 15
+          }
+        ]);
+
+        // Return the selected file paths
+        return selectedPaths;
       };
 
       // Check if rembg is installed
-      try {
-        await execPromise('rembg --help');
-      } catch (error) {
-        console.error('Error: rembg tool is not installed or not in PATH.');
-        console.log('Please install rembg using: pip install rembg');
-        return;
-      }
 
       // Select files using the directory navigation
       const inputFiles = await selectFiles();
@@ -258,6 +184,15 @@ export const rembgCommand = {
 
       // Get the flags for the rembg command
       const flags = rembgSettings.flags.join(' ');
+
+      try {
+        await execPromise('rembg --help');
+      } catch (error) {
+        console.error('Error: rembg tool is not installed or not in PATH.');
+        console.log('Please install rembg using: pip install rembg');
+        return;
+      }
+
 
       // Process each selected file
       console.log('\nProcessing selected files:');
