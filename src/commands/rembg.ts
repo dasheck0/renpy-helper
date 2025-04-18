@@ -86,70 +86,150 @@ export const rembgCommand = {
       const selectFiles = async (): Promise<string[]> => {
         // Start from the input directory in settings
         let currentDir = path.resolve(rembgSettings.inputDirectory);
-        const selectedFiles: string[] = [];
+        let selectedFiles: string[] = [];
         let done = false;
 
-        while (!done) {
-          // Show currently selected files
-          if (selectedFiles.length > 0) {
-            console.log('\nCurrently selected files:');
-            selectedFiles.forEach((file, index) => {
-              console.log(`${index + 1}. ${file}`);
-            });
-          }
+        // Keep track of selected files in each directory
+        const selectedFilesMap = new Map<string, Set<string>>();
 
+        while (!done) {
           console.log(`\nCurrent directory: ${currentDir}`);
 
-          const choices = getFilesAndDirs(currentDir);
+          // Get all files and directories in the current directory
+          const dirItems = getFilesAndDirs(currentDir);
 
-          if (choices.length === 0) {
+          if (dirItems.length === 0) {
             console.log('No files or directories found in this location.');
             // If empty directory, automatically go up one level
             currentDir = path.resolve(currentDir, '..');
             continue;
           }
 
-          // Add a 'Done selecting' option if at least one file is selected
-          const promptChoices = [...choices];
-          if (selectedFiles.length > 0) {
-            promptChoices.unshift({
-              name: '✓ Done selecting files',
-              value: 'done',
-              isDirectory: false
-            });
+          // Filter out directories and files
+          const directories = dirItems.filter(item => item.isDirectory);
+          const files = dirItems.filter(item => !item.isDirectory);
+
+          // Get the set of selected files in the current directory
+          const selectedInCurrentDir = selectedFilesMap.get(currentDir) || new Set<string>();
+
+          // If there are files in this directory, show the checkbox selection
+          if (files.length > 0) {
+            // Create checkbox choices for files
+            const fileChoices = files.map(file => ({
+              name: `${selectedInCurrentDir.has(file.value) ? '(o)' : '( )'} ${file.name}`,
+              value: file.value,
+              short: file.name
+            }));
+
+            // Add a confirm selection option
+            const confirmOption = {
+              name: `--- ${selectedFiles.length > 0 ? 'Confirm selection' : 'No files selected (select with SPACE)'} ---`,
+              value: 'confirm'
+            };
+
+            // Add a parent directory option
+            const parentOption = {
+              name: '../ (Go up one directory)',
+              value: '..'
+            };
+
+            // Prompt for file selection
+            const { selectedItems } = await inquirer.prompt([
+              {
+                type: 'checkbox',
+                name: 'selectedItems',
+                message: 'Select files with SPACE, navigate with arrow keys, confirm with ENTER:',
+                choices: [
+                  new inquirer.Separator('--- Navigation ---'),
+                  parentOption,
+                  confirmOption,
+                  new inquirer.Separator('--- Files ---'),
+                  ...fileChoices
+                ],
+                pageSize: 15,
+                default: Array.from(selectedInCurrentDir)
+              }
+            ]);
+
+            // Check if the user wants to navigate up
+            if (selectedItems.includes('..')) {
+              // Go up one directory
+              currentDir = path.resolve(currentDir, '..');
+              continue;
+            }
+
+            // Check if the user wants to confirm the selection
+            if (selectedItems.includes('confirm')) {
+              // Remove the confirm option from the selection
+              const actualFiles = selectedItems.filter((item: string) => item !== 'confirm' && item !== '..');
+
+              // Update the selected files in the current directory
+              selectedFilesMap.set(currentDir, new Set(actualFiles));
+
+              // If there are selected files, we're done
+              if (selectedFiles.length > 0) {
+                done = true;
+              } else {
+                console.log('\nNo files selected. Please select at least one file or navigate to another directory.');
+              }
+              continue;
+            }
+
+            // Update the selected files in the current directory
+            selectedFilesMap.set(currentDir, new Set(selectedItems.filter((item: string) => item !== '..')));
+
+            // Update the overall selected files list
+            selectedFiles = [];
+            for (const [dir, files] of selectedFilesMap.entries()) {
+              for (const file of files) {
+                selectedFiles.push(path.join(dir, file));
+              }
+            }
+
+            // Show the current selection
+            if (selectedFiles.length > 0) {
+              console.log('\nCurrently selected files:');
+              selectedFiles.forEach((file, index) => {
+                console.log(`${index + 1}. ${file}`);
+              });
+            }
+
+            continue;
           }
 
+          // If there are only directories, show a list selection
           const { selected } = await inquirer.prompt([
             {
               type: 'list',
               name: 'selected',
               message: selectedFiles.length > 0
-                ? 'Select more files or directories (or choose Done):'
-                : 'Select a file or directory:',
-              choices: promptChoices,
+                ? `Navigate to a directory (${selectedFiles.length} files selected):`
+                : 'Navigate to a directory:',
+              choices: [
+                ...directories,
+                new inquirer.Separator('---'),
+                {
+                  name: selectedFiles.length > 0 ? 'Confirm selection' : 'No files selected',
+                  value: 'confirm'
+                }
+              ],
               pageSize: 15
             }
           ]);
 
-          // Handle selection
-          if (selected === 'done') {
-            // Finish selection
-            done = true;
+          // Handle directory navigation or confirmation
+          if (selected === 'confirm') {
+            if (selectedFiles.length > 0) {
+              done = true;
+            } else {
+              console.log('\nNo files selected. Please navigate to a directory with files.');
+            }
           } else if (selected === '..') {
             // Go up one directory
             currentDir = path.resolve(currentDir, '..');
           } else {
-            const selectedPath = path.join(currentDir, selected);
-            const stats = fs.statSync(selectedPath);
-
-            if (stats.isDirectory()) {
-              // Navigate into the directory
-              currentDir = selectedPath;
-            } else {
-              // Add file to selected files
-              selectedFiles.push(selectedPath);
-              console.log(`Added: ${selectedPath}`);
-            }
+            // Navigate into the selected directory
+            currentDir = path.join(currentDir, selected);
           }
         }
 
