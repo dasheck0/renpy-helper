@@ -120,7 +120,7 @@ async function release() {
     // Commit version bump
     console.log('Committing version bump...');
     exec('git add package.json src/index.ts');
-    exec(`git commit -m "chore: bump version to ${newVersion}"`);
+    exec(`git commit -am "chore: bump version to ${newVersion}"`);
 
     // Finish git flow release with a tag
     const tagName = `v${newVersion}`;
