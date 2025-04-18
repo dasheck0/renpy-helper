@@ -119,7 +119,6 @@ async function release() {
     // Use -t to specify a custom tag name (with 'v' prefix)
     // Note: This will open an editor for commit messages
     exec(`git flow release finish ${newVersion} -m "${newVersion}"`);
-    exec(`git tag v${newVersion} -m "${newVersion}"`);
     exec(`git push origin master develop ${tagName} --tags`);
 
     console.log(`\nRelease ${newVersion} created successfully!`);
