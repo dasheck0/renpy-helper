@@ -1,13 +1,9 @@
 import { exec } from 'child_process';
 import fs from 'fs';
 import inquirer from 'inquirer';
-import AutocompletePrompt from 'inquirer-autocomplete-prompt';
 import path from 'path';
 import util from 'util';
 import { SettingsManager } from '../utils/settings-manager';
-
-// Register the autocomplete prompt
-inquirer.registerPrompt('autocomplete', AutocompletePrompt);
 
 const execPromise = util.promisify(exec);
 
@@ -20,14 +16,6 @@ export const rembgCommand = {
       const settingsManager = new SettingsManager();
       const rembgSettings = settingsManager.getRembgSettings();
 
-      // Check if rembg is installed
-      try {
-        await execPromise('rembg --help');
-      } catch (error) {
-        console.error('Error: rembg tool is not installed or not in PATH.');
-        console.log('Please install rembg using: pip install rembg');
-        return;
-      }
 
       // Common image file extensions
       const imageExtensions = [
@@ -40,96 +28,111 @@ export const rembgCommand = {
         return imageExtensions.includes(ext);
       };
 
-      // Helper function to search for files
-      const searchFiles = async (input = '') => {
-        input = input || '.';
-
-        // Get the directory and base name from the input
-        let searchDir = path.dirname(input === '' ? '.' : input);
-        const searchBase = path.basename(input);
-
-        // If the input ends with a separator, we're searching in that directory
-        if (input.endsWith(path.sep)) {
-          searchDir = input;
-        }
-
-        // Make sure the search directory exists
-        if (!fs.existsSync(searchDir)) {
-          return [];
-        }
-
+      // Function to get files and directories in a given directory
+      const getFilesAndDirs = (dirPath: string) => {
         try {
-          // Get all files and directories in the search directory
-          const files = fs.readdirSync(searchDir, { withFileTypes: true });
+          // Get all files and directories in the given directory
+          const items = fs.readdirSync(dirPath, { withFileTypes: true });
+
+          // Add parent directory option if not in root
+          const result = [];
+          const resolvedPath = path.resolve(dirPath);
+          const parentPath = path.resolve(dirPath, '..');
+
+          // Only add parent directory option if we're not at the root
+          if (resolvedPath !== parentPath) {
+            result.push({
+              name: '../ (Go up one directory)',
+              value: '..',
+              isDirectory: true
+            });
+          }
 
           // Filter and format the results
-          return files
-            .filter(file => {
-              // Include if name matches search and is either a directory or an image file
-              if (!file.name.toLowerCase().includes(searchBase.toLowerCase())) {
+          const filteredItems = items
+            .filter(item => {
+              // Skip hidden files (starting with .)
+              if (item.name.startsWith('.')) {
                 return false;
               }
 
-              if (file.isDirectory()) {
+              // Include directories and image files
+              if (item.isDirectory()) {
                 return true;
               }
 
-              return isImageFile(file.name);
+              return isImageFile(item.name);
             })
-            .map(file => {
-              const filePath = path.join(searchDir, file.name);
-              // Add a trailing slash for directories
-              return file.isDirectory() ? `${filePath}${path.sep}` : filePath;
-            })
+            .map(item => ({
+              name: item.isDirectory() ? `${item.name}/` : item.name,
+              value: item.name,
+              isDirectory: item.isDirectory()
+            }))
             .sort((a, b) => {
               // Sort directories first, then files
-              const aIsDir = a.endsWith(path.sep);
-              const bIsDir = b.endsWith(path.sep);
-              if (aIsDir && !bIsDir) return -1;
-              if (!aIsDir && bIsDir) return 1;
-              return a.localeCompare(b);
+              if (a.isDirectory && !b.isDirectory) return -1;
+              if (!a.isDirectory && b.isDirectory) return 1;
+              return a.name.localeCompare(b.name);
             });
+
+          return [...result, ...filteredItems];
         } catch (error) {
-          console.error('Error reading directory:', error);
+          console.error(`Error reading directory ${dirPath}:`, error);
           return [];
         }
       };
 
-      // Ask for the input file with autocomplete
-      // @ts-ignore - Type definitions for autocomplete prompt are not perfect
-      const answers = await inquirer.prompt([
-        {
-          type: 'autocomplete',
-          name: 'inputFile',
-          message: 'Enter the path to the image file:',
-          source: async (_: any, input: string) => {
-            return searchFiles(input);
-          },
-          validate: (input: string) => {
-            if (!input.trim()) {
-              return 'Please enter a valid file path';
-            }
+      // Function to navigate directories and select a file
+      const selectFile = async (): Promise<string> => {
+        // Start from the input directory in settings
+        let currentDir = path.resolve(rembgSettings.inputDirectory);
+        let selectedFile: string | null = null;
 
-            if (!fs.existsSync(input)) {
-              return 'File does not exist';
-            }
+        while (selectedFile === null) {
+          console.log(`\nCurrent directory: ${currentDir}`);
 
-            // Check if it's a file (not a directory)
-            if (fs.statSync(input).isDirectory()) {
-              return 'Please select a file, not a directory';
-            }
+          const choices = getFilesAndDirs(currentDir);
 
-            // Check if it's an image file
-            if (!isImageFile(input)) {
-              return 'Please select an image file';
-            }
+          if (choices.length === 0) {
+            console.log('No files or directories found in this location.');
+            // If empty directory, automatically go up one level
+            currentDir = path.resolve(currentDir, '..');
+            continue;
+          }
 
-            return true;
+          const { selected } = await inquirer.prompt([
+            {
+              type: 'list',
+              name: 'selected',
+              message: 'Select a file or directory:',
+              choices: choices,
+              pageSize: 15
+            }
+          ]);
+
+          // Handle selection
+          if (selected === '..') {
+            // Go up one directory
+            currentDir = path.resolve(currentDir, '..');
+          } else {
+            const selectedPath = path.join(currentDir, selected);
+            const stats = fs.statSync(selectedPath);
+
+            if (stats.isDirectory()) {
+              // Navigate into the directory
+              currentDir = selectedPath;
+            } else {
+              // Selected a file
+              selectedFile = selectedPath;
+            }
           }
         }
-      ]);
 
-      const inputFile = answers.inputFile;
+        return selectedFile;
+      };
+
+      // Select a file using the directory navigation
+      const inputFile = await selectFile();
       const parsedPath = path.parse(inputFile);
 
       // Ensure output directory exists
@@ -143,6 +146,16 @@ export const rembgCommand = {
 
       console.log(`Processing ${inputFile}...`);
       console.log(`Output will be saved as ${outputFile}`);
+
+
+      // Check if rembg is installed
+      try {
+        await execPromise('rembg --help');
+      } catch (error) {
+        console.error('Error: rembg tool is not installed or not in PATH.');
+        console.log('Please install rembg using: pip install rembg');
+        return;
+      }
 
       // Execute rembg command with the settings parameters
       const flags = rembgSettings.flags.join(' ');
