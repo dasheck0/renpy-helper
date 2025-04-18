@@ -107,10 +107,20 @@ async function release() {
     packageJson.version = newVersion;
     writePackageJson(packageJson);
 
+    // Update version in index.ts
+    console.log('Updating version in index.ts...');
+    const indexPath = path.join(process.cwd(), 'src/index.ts');
+    let indexContent = fs.readFileSync(indexPath, 'utf8');
+    indexContent = indexContent.replace(
+      /\.version\('\d+\.\d+\.\d+'\)/,
+      `.version('${newVersion}')`
+    );
+    fs.writeFileSync(indexPath, indexContent, 'utf8');
+
     // Commit version bump
     console.log('Committing version bump...');
-    exec('git add package.json');
-    exec(`git commit -m "chore: bump version to ${newVersion}"`);
+    exec('git add package.json src/index.ts');
+    exec(`git commit -am "chore: bump version to ${newVersion}"`);
 
     // Finish git flow release with a tag
     const tagName = `v${newVersion}`;

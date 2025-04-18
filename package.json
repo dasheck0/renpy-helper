@@ -1,11 +1,16 @@
 {
   "name": "@dasheck0/renpy-helper",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "This is a cli tool that offers some tools that are helpful developing visual novels using renpy",
   "main": "dist/index.js",
   "bin": {
     "renpy-helper": "dist/index.js"
   },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
