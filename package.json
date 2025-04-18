@@ -1,6 +1,6 @@
 {
   "name": "@dasheck0/renpy-helper",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "This is a cli tool that offers some tools that are helpful developing visual novels using renpy",
   "main": "dist/index.js",
   "bin": {
@@ -21,7 +21,7 @@
   "license": "MIT",
   "dependencies": {
     "commander": "^13.1.0",
-    "inquirer": "^12.5.2",
+    "inquirer": "^9.3.7",
     "inquirer-autocomplete-prompt": "^3.0.1"
   },
   "devDependencies": {
