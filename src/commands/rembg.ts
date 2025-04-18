@@ -1,13 +1,13 @@
 import { exec } from 'child_process';
 import fs from 'fs';
 import inquirer from 'inquirer';
+import AutocompletePrompt from 'inquirer-autocomplete-prompt';
 import path from 'path';
 import util from 'util';
 import { SettingsManager } from '../utils/settings-manager';
 
 // Register the autocomplete prompt
-// @ts-ignore - Type definitions might not match exactly but it works at runtime
-inquirer.registerPrompt('autocomplete', require('inquirer-autocomplete-prompt'));
+inquirer.registerPrompt('autocomplete', AutocompletePrompt);
 
 const execPromise = util.promisify(exec);
 
