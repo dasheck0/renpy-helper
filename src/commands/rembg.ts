@@ -5,6 +5,10 @@ import path from 'path';
 import util from 'util';
 import { SettingsManager } from '../utils/settings-manager';
 
+// Register the autocomplete prompt
+// @ts-ignore - Type definitions might not match exactly but it works at runtime
+inquirer.registerPrompt('autocomplete', require('inquirer-autocomplete-prompt'));
+
 const execPromise = util.promisify(exec);
 
 export const rembgCommand = {
@@ -25,12 +29,82 @@ export const rembgCommand = {
         return;
       }
 
-      // Ask for the input file
+      // Common image file extensions
+      const imageExtensions = [
+        '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'
+      ];
+
+      // Helper function to check if a file is an image
+      const isImageFile = (filePath: string): boolean => {
+        const ext = path.extname(filePath).toLowerCase();
+        return imageExtensions.includes(ext);
+      };
+
+      // Helper function to search for files
+      const searchFiles = async (input = '') => {
+        input = input || '.';
+
+        // Get the directory and base name from the input
+        let searchDir = path.dirname(input === '' ? '.' : input);
+        const searchBase = path.basename(input);
+
+        // If the input ends with a separator, we're searching in that directory
+        if (input.endsWith(path.sep)) {
+          searchDir = input;
+        }
+
+        // Make sure the search directory exists
+        if (!fs.existsSync(searchDir)) {
+          return [];
+        }
+
+        try {
+          // Get all files and directories in the search directory
+          const files = fs.readdirSync(searchDir, { withFileTypes: true });
+
+          // Filter and format the results
+          return files
+            .filter(file => {
+              // Include if name matches search and is either a directory or an image file
+              if (!file.name.toLowerCase().includes(searchBase.toLowerCase())) {
+                return false;
+              }
+
+              if (file.isDirectory()) {
+                return true;
+              }
+
+              return isImageFile(file.name);
+            })
+            .map(file => {
+              const filePath = path.join(searchDir, file.name);
+              // Add a trailing slash for directories
+              return file.isDirectory() ? `${filePath}${path.sep}` : filePath;
+            })
+            .sort((a, b) => {
+              // Sort directories first, then files
+              const aIsDir = a.endsWith(path.sep);
+              const bIsDir = b.endsWith(path.sep);
+              if (aIsDir && !bIsDir) return -1;
+              if (!aIsDir && bIsDir) return 1;
+              return a.localeCompare(b);
+            });
+        } catch (error) {
+          console.error('Error reading directory:', error);
+          return [];
+        }
+      };
+
+      // Ask for the input file with autocomplete
+      // @ts-ignore - Type definitions for autocomplete prompt are not perfect
       const answers = await inquirer.prompt([
         {
-          type: 'input',
+          type: 'autocomplete',
           name: 'inputFile',
           message: 'Enter the path to the image file:',
+          source: async (_: any, input: string) => {
+            return searchFiles(input);
+          },
           validate: (input: string) => {
             if (!input.trim()) {
               return 'Please enter a valid file path';
@@ -38,6 +112,16 @@ export const rembgCommand = {
 
             if (!fs.existsSync(input)) {
               return 'File does not exist';
+            }
+
+            // Check if it's a file (not a directory)
+            if (fs.statSync(input).isDirectory()) {
+              return 'Please select a file, not a directory';
+            }
+
+            // Check if it's an image file
+            if (!isImageFile(input)) {
+              return 'Please select an image file';
             }
 
             return true;
