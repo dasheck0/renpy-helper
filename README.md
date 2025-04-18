@@ -1,4 +1,11 @@
 # Renpy Helper
+
+[![npm version](https://img.shields.io/npm/v/@dasheck0/renpy-helper.svg)](https://www.npmjs.com/package/@dasheck0/renpy-helper)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue.svg)](https://www.typescriptlang.org/)
+[![Node.js CI](https://github.com/dasheck0/renpy-helper/actions/workflows/npm_publish.yml/badge.svg)](https://github.com/dasheck0/renpy-helper/actions/workflows/npm_publish.yml)
+[![Test Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](https://github.com/dasheck0/renpy-helper)
+
 <!-- section: Introduction -->
 
 Renpy Helper is a CLI tool that offers helpful utilities for developing visual novels using Ren'Py. It provides a collection of commands to streamline common tasks in the visual novel development workflow.
@@ -19,9 +26,10 @@ renpy-helper rembg
 ```
 
 This command will:
-1. Prompt you to enter the path to an image file
-2. Process the image using the rembg tool with your configured settings
-3. Save the output to your configured output directory with "_clean" added to the filename
+1. Allow you to navigate to a directory containing image files
+2. Let you select multiple image files using checkbox selection (space to select, enter to confirm)
+3. Process each selected image using the rembg tool with your configured settings
+4. Save the outputs to your configured output directory with "_clean" added to each filename
 
 ### Settings Management
 
@@ -32,7 +40,10 @@ renpy-helper settings
 
 This command allows you to configure:
 - rembg command flags (default: `-a -m isnet-general-use`)
+- Input directory for source files (default: `.`)
 - Output directory for processed files (default: `./output`)
+
+Both input and output directories can be selected through an interactive directory navigation interface.
 
 
 ## API
@@ -56,6 +67,7 @@ Settings are stored in a `.renpy-helper-settings.json` file in the current direc
 {
   "rembg": {
     "flags": ["-a", "-m", "isnet-general-use"],
+    "inputDirectory": ".",
     "outputDirectory": "./output"
   }
 }
@@ -67,8 +79,8 @@ Settings are stored in a `.renpy-helper-settings.json` file in the current direc
 
 ### Prerequisites
 
-- Node.js (v14 or higher)
-- npm (v6 or higher)
+- Node.js (v16 or higher)
+- npm (v7 or higher)
 - Python with rembg installed (`pip install rembg`)
 
 ### Global Installation
@@ -104,6 +116,15 @@ npm run dev
 
 # Build the project
 npm run build
+
+# Run tests
+npm test
+
+# Run tests with watch mode
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
 ```
 
 ### Adding New Commands
@@ -111,6 +132,21 @@ npm run build
 1. Create a new file in the `src/commands` directory
 2. Export a command object with `name`, `description`, and `action` properties
 3. Import and register the command in `src/index.ts`
+
+### Testing
+
+This project uses Jest for testing. Tests are located in the `src/__tests__` directory, mirroring the structure of the source code.
+
+- Unit tests are written for utility functions and classes
+- Each component has its own test file
+- Mock-fs is used to simulate file system operations without touching the actual file system
+
+To add new tests:
+
+1. Create a new test file in the appropriate directory under `src/__tests__`
+2. Use Jest's `describe` and `test` functions to organize your tests
+3. Mock external dependencies as needed
+4. Run tests with `npm test`
 
 ### Release Process
 
@@ -137,9 +173,12 @@ The script will:
 This project uses GitHub Actions for continuous integration:
 
 - **npm_publish.yml**: Automatically publishes the package to npm and GitHub Packages when a new version tag (v*) is pushed
-  - Runs linting and tests
+  - Runs the test suite to ensure code quality
+  - Builds the project to verify compilation
   - Publishes to npm registry and GitHub Packages
   - Requires NPM_TOKEN secret to be set in the repository
+
+The CI pipeline ensures that all tests pass before publishing a new version, maintaining code quality and reliability.
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/dasheck0/renpy-helper. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the Contributor Covenant code of conduct.
 
