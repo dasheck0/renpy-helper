@@ -1,6 +1,6 @@
 {
   "name": "@dasheck0/renpy-helper",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "This is a cli tool that offers some tools that are helpful developing visual novels using renpy",
   "main": "dist/index.js",
   "bin": {
