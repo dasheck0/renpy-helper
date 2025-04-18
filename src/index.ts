@@ -9,7 +9,7 @@ const program = new Command();
 program
   .name('renpy-helper')
   .description('CLI tool that offers helpful utilities for developing visual novels using Ren\'Py')
-  .version('1.0.0');
+  .version('1.0.7'); // This should match the version in package.json
 
 // Register commands
 program
