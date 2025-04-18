@@ -82,13 +82,22 @@ export const rembgCommand = {
         }
       };
 
-      // Function to navigate directories and select a file
-      const selectFile = async (): Promise<string> => {
+      // Function to navigate directories and select multiple files
+      const selectFiles = async (): Promise<string[]> => {
         // Start from the input directory in settings
         let currentDir = path.resolve(rembgSettings.inputDirectory);
-        let selectedFile: string | null = null;
+        const selectedFiles: string[] = [];
+        let done = false;
 
-        while (selectedFile === null) {
+        while (!done) {
+          // Show currently selected files
+          if (selectedFiles.length > 0) {
+            console.log('\nCurrently selected files:');
+            selectedFiles.forEach((file, index) => {
+              console.log(`${index + 1}. ${file}`);
+            });
+          }
+
           console.log(`\nCurrent directory: ${currentDir}`);
 
           const choices = getFilesAndDirs(currentDir);
@@ -100,18 +109,33 @@ export const rembgCommand = {
             continue;
           }
 
+          // Add a 'Done selecting' option if at least one file is selected
+          const promptChoices = [...choices];
+          if (selectedFiles.length > 0) {
+            promptChoices.unshift({
+              name: '✓ Done selecting files',
+              value: 'done',
+              isDirectory: false
+            });
+          }
+
           const { selected } = await inquirer.prompt([
             {
               type: 'list',
               name: 'selected',
-              message: 'Select a file or directory:',
-              choices: choices,
+              message: selectedFiles.length > 0
+                ? 'Select more files or directories (or choose Done):'
+                : 'Select a file or directory:',
+              choices: promptChoices,
               pageSize: 15
             }
           ]);
 
           // Handle selection
-          if (selected === '..') {
+          if (selected === 'done') {
+            // Finish selection
+            done = true;
+          } else if (selected === '..') {
             // Go up one directory
             currentDir = path.resolve(currentDir, '..');
           } else {
@@ -122,31 +146,15 @@ export const rembgCommand = {
               // Navigate into the directory
               currentDir = selectedPath;
             } else {
-              // Selected a file
-              selectedFile = selectedPath;
+              // Add file to selected files
+              selectedFiles.push(selectedPath);
+              console.log(`Added: ${selectedPath}`);
             }
           }
         }
 
-        return selectedFile;
+        return selectedFiles;
       };
-
-      // Select a file using the directory navigation
-      const inputFile = await selectFile();
-      const parsedPath = path.parse(inputFile);
-
-      // Ensure output directory exists
-      const outputDir = settingsManager.ensureOutputDirectoryExists();
-
-      // Create output file path
-      const outputFile = path.join(
-        outputDir,
-        `${parsedPath.name}_clean${parsedPath.ext}`
-      );
-
-      console.log(`Processing ${inputFile}...`);
-      console.log(`Output will be saved as ${outputFile}`);
-
 
       // Check if rembg is installed
       try {
@@ -157,18 +165,54 @@ export const rembgCommand = {
         return;
       }
 
-      // Execute rembg command with the settings parameters
-      const flags = rembgSettings.flags.join(' ');
-      const { stderr } = await execPromise(
-        `rembg ${flags} "${inputFile}" "${outputFile}"`
-      );
+      // Select files using the directory navigation
+      const inputFiles = await selectFiles();
 
-      if (stderr) {
-        console.error('Error:', stderr);
+      if (inputFiles.length === 0) {
+        console.log('No files selected. Exiting.');
         return;
       }
 
-      console.log(`Background removed successfully! Output saved to: ${outputFile}`);
+      // Ensure output directory exists
+      const outputDir = settingsManager.ensureOutputDirectoryExists();
+
+      // Get the flags for the rembg command
+      const flags = rembgSettings.flags.join(' ');
+
+      // Process each selected file
+      console.log('\nProcessing selected files:');
+      for (const inputFile of inputFiles) {
+        const parsedPath = path.parse(inputFile);
+
+        // Create output file path
+        const outputFile = path.join(
+          outputDir,
+          `${parsedPath.name}_clean${parsedPath.ext}`
+        );
+
+        console.log(`\nProcessing ${inputFile}...`);
+        console.log(`Output will be saved as ${outputFile}`);
+
+        try {
+          // Execute rembg command with the settings parameters
+          const { stderr } = await execPromise(
+            `rembg ${flags} "${inputFile}" "${outputFile}"`
+          );
+
+          if (stderr) {
+            console.error(`Error processing ${inputFile}:`, stderr);
+            continue;
+          }
+
+          console.log(`Background removed successfully! Output saved to: ${outputFile}`);
+        } catch (error) {
+          console.error(`Error processing ${inputFile}:`, error);
+        }
+      }
+
+      console.log('\nAll files processed.');
+      console.log(`Total files processed: ${inputFiles.length}`);
+      console.log(`Output directory: ${outputDir}`);
     } catch (error) {
       console.error('An error occurred:', error);
     }
