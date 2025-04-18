@@ -50,6 +50,15 @@ function updateVersion(currentVersion, releaseType) {
 
 // Main release function
 async function release() {
+  // Check if git flow is installed
+  try {
+    execSync('git flow version', { stdio: 'ignore' });
+  } catch (error) {
+    console.error('Error: git flow is not installed. Please install git flow first.');
+    console.error('See https://github.com/nvie/gitflow/wiki/Installation for installation instructions.');
+    process.exit(1);
+  }
+
   // Check if git is clean
   try {
     execSync('git diff-index --quiet HEAD --');
@@ -84,30 +93,32 @@ async function release() {
       process.exit(1);
     }
 
-    // Update version in package.json
+    // Get current version and calculate new version
     const packageJson = readPackageJson();
     const currentVersion = packageJson.version;
     const newVersion = updateVersion(currentVersion, releaseType);
-    packageJson.version = newVersion;
-
-    console.log(`Updating version from ${currentVersion} to ${newVersion}...`);
-    writePackageJson(packageJson);
 
     // Start git flow release
     console.log(`Starting git flow release for version ${newVersion}...`);
     exec(`git flow release start ${newVersion}`);
 
+    // Update version in package.json
+    console.log(`Updating version from ${currentVersion} to ${newVersion}...`);
+    packageJson.version = newVersion;
+    writePackageJson(packageJson);
+
     // Commit version bump
     console.log('Committing version bump...');
     exec('git add package.json');
-    exec(`git commit -am "chore: bump version to ${newVersion}"`);
+    exec(`git commit -m "chore: bump version to ${newVersion}"`);
 
     // Finish git flow release with a tag
     const tagName = `v${newVersion}`;
     console.log(`Finishing release and creating tag: ${tagName}...`);
 
     // Use -t to specify a custom tag name (with 'v' prefix)
-    exec(`git flow release finish -m "Release ${newVersion}" -t "${tagName}" ${newVersion}`);
+    // Note: This will open an editor for commit messages
+    exec(`git flow release finish -t "${tagName}" ${newVersion}`);
 
     console.log(`\nRelease ${newVersion} created successfully!`);
     console.log(`\nTo complete the release and trigger the npm_publish workflow, run:`);
