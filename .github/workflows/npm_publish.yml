@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org/
-      - run: npm i
+      - run: npm install --legacy-peer-deps
       # - run: npm run lint
       # - run: npm test
       - run: npm publish --access public
