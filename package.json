@@ -1,6 +1,6 @@
 {
-  "name": "dasheck0-renpy-helper",
-  "version": "1.0.0",
+  "name": "@dasheck0/renpy-helper",
+  "version": "1.0.2",
   "description": "This is a cli tool that offers some tools that are helpful developing visual novels using renpy",
   "main": "dist/index.js",
   "bin": {
@@ -10,7 +10,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "release": "node scripts/release.js"
   },
   "author": "Stefan Neidig <s.neidig@nanogiants.de> (https://nanogiants.de/)",
   "license": "MIT",
