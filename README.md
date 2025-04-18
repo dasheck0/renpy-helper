@@ -112,6 +112,26 @@ npm run build
 2. Export a command object with `name`, `description`, and `action` properties
 3. Import and register the command in `src/index.ts`
 
+### Release Process
+
+This project follows the git flow workflow for releases. To create a new release:
+
+```bash
+# Make sure you're on the develop branch with all changes committed
+git checkout develop
+
+# Run the release script
+npm run release
+```
+
+The script will:
+1. Ask for the release type (patch, minor, or major)
+2. Update the version in package.json
+3. Create a release branch using git flow
+4. Commit the version bump
+5. Finish the release with a tag starting with 'v'
+6. Provide instructions for pushing to trigger the npm publish workflow
+
 ### Continuous Integration
 
 This project uses GitHub Actions for continuous integration:
