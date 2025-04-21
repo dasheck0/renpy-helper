@@ -144,10 +144,29 @@ export const rembgCommand = {
         // Now in file selection mode - get all image files in the current directory
         const files = getFilesAndDirs(currentDir)
           .filter(item => !item.isDirectory)
-          .map(file => ({
-            name: file.name,
-            value: path.join(currentDir, file.value)
-          }));
+          .map(file => {
+            const filePath = path.join(currentDir, file.value);
+            const stats = fs.statSync(filePath);
+            const creationDate = new Date(stats.birthtime);
+            const formattedDate = creationDate.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric'
+            });
+            const formattedTime = creationDate.toLocaleTimeString('en-GB', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            });
+
+            return {
+              name: `${file.name} (${formattedDate} ${formattedTime})`,
+              value: filePath,
+              creationTime: stats.birthtime.getTime() // Store creation time for sorting
+            };
+          })
+          // Sort files from newest to oldest
+          .sort((a, b) => b.creationTime - a.creationTime);
 
         if (files.length === 0) {
           console.log('No files found in this directory.');
